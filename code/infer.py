@@ -38,25 +38,26 @@ def save_batch_objs(bps,face_index,batch,names):
 		assert(False)
 
 def read_img(file):
-	img=cv2.imread(file)
-	h=img.shape[0]
-	w=img.shape[1]
-	if h!=w:
-		l=max(h,w)
-		nimg=np.zeros((l,l,3),np.uint8)
-		hs=max(int((l-h)/2.),0)
-		he=min(int((l+h)/2.),l)
-		he=min(he,hs+h)
-		ws=max(int((l-w)/2.),0)
-		we=min(int((l+w)/2.),l)
-		we=min(we,ws+w)
-		nimg[hs:he,ws:we]=img[:he-hs,:we-ws]
-	else:
-		nimg=img
-	nimg=cv2.resize(nimg,(540,540))
-	nimg=nimg.transpose(2,0,1)
-	nimg=nimg.astype(np.float32)/255.
-	return nimg
+    img = cv2.imread(file)
+    h = img.shape[0]
+    w = img.shape[1]
+    if h != w:
+        l = max(h, w)
+        nimg = np.zeros((l, l, 3), np.uint8)
+        hs = max(int((l - h) / 2.), 0)
+        he = min(int((l + h) / 2.), l)
+        he = min(he, hs + h)
+        ws = max(int((l - w) / 2.), 0)
+        we = min(int((l + w) / 2.), l)
+        we = min(we, ws + w)
+        nimg[hs:he, ws:we] = img[:he - hs, :we - ws]
+    else:
+        nimg = img
+    nimg = cv2.resize(nimg, (540, 540))
+    nimg = nimg.transpose(2, 0, 1)
+    nimg = nimg.astype(np.float64) / 255.
+    nimg = torch.tensor(nimg, dtype=torch.float32)  # Convert to float32 (FloatTensor)
+    return nimg
 
 parser = argparse.ArgumentParser(description='img rec comparing')
 parser.add_argument('--gpu-id',default=0,type=int,metavar='ID',
@@ -115,22 +116,10 @@ skinWsNet=SkinWeightNet(4,True)
 net=M.ImageReconstructModel(skinWsNet,True)
 
 # Load saved weights
-saved_weights = torch.load('../models/garNet.pth', map_location='cpu')
-
-# Load the current model's state dict
-current_weights = net.state_dict()
-
-# Update compatible keys
-for key in current_weights.keys():
-    if key in saved_weights and current_weights[key].shape == saved_weights[key].shape:
-        current_weights[key] = saved_weights[key]
-
-# Load updated weights into the model
-net.load_state_dict(current_weights, True)
-
-#net.load_state_dict(torch.load('../models/garNet.pth',map_location='cpu'),True)
-net=net.to(device)
+saved_weights = torch.load( '/content/drive/MyDrive/garNet.pth', map_location='cpu')
+net = net.to(device).float()  # Move model to the correct device and convert to float32
 net.eval()
+
 
 # img_files=glob('MGN_datas/*.jpg')
 batch_num=len(img_files)//batch_size

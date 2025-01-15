@@ -8,7 +8,7 @@ from module.SkinWeightModel import SkinWeightNet
 from smpl_pytorch.SMPL import SMPL
 from smpl_pytorch.util import batch_rodrigues,batch_global_rigid_transformation
 from torchvision.models import resnet50
-from torchvision.models import models
+
 import numpy as np
 import os.path as osp
 from torchvision.ops import roi_align
@@ -119,20 +119,23 @@ class PatchEncoder(Module):
 # origine
 
 
+import torch
+import torch.nn as nn
+from torchvision.models import resnet50
+import numpy as np
 
 class ImageEncoder(nn.Module):
     def __init__(self, size=[540, 540], gar_latent_size=256, pretrained_weights_path=None):
         super(ImageEncoder, self).__init__()
         
-        # Load the pretrained ResNet-50 model
-        resnet50 = models.resnet50(pretrained=False)
+        # Load the ResNet-50 model
+        self.resnet50 = resnet50(pretrained=False)  # Use the correct model initialization
         
         # Load the weights for ResNet-50 (you can load your trained weights here)
         if pretrained_weights_path:
-            resnet50.load_state_dict(torch.load(pretrained_weights_path))
-        
-        # Use the ResNet-50 model layers
-        self.resnet50 = resnet50
+            checkpoint = torch.load(pretrained_weights_path)
+            model_state_dict = checkpoint['model_state_dict'] if 'model_state_dict' in checkpoint else checkpoint
+            self.resnet50.load_state_dict(model_state_dict, strict=False)
         
         # The fully connected layers should correspond to the size you want to output
         self.fc = nn.Linear(2048, 2048)  # ResNet-50 has 2048 features from the last layer
@@ -144,6 +147,9 @@ class ImageEncoder(nn.Module):
         self.gar_latent_size = gar_latent_size
         self.gar_Hierarchifs_size = 64 + 128 + 256 + 512
         self.gar_fc = nn.Linear(2048, self.gar_latent_size)
+
+        # Define ReLU activation function
+        self.relu = nn.ReLU()
 
         # Mean value from your training set
         self.register_buffer('tran_mean', torch.from_numpy(np.array([-1.0962e-02,  2.8778e-01,  1.2973e+01]).astype(np.float32)))
@@ -170,7 +176,7 @@ class ImageEncoder(nn.Module):
         # Additional fully connected layers
         x = self.dropout(x)
         x = self.fc(x)
-        x = self.relu(x)
+        x = self.relu(x)  # Apply ReLU activation after the fully connected layer
         
         shapes = self.shape_fc(x)
         poses = self.pose_fc(x)
@@ -178,7 +184,10 @@ class ImageEncoder(nn.Module):
         gars = self.gar_fc(x)
         
         return shapes, poses, trans, gars, (fs1, fs2, fs3, fs4)
-model = ImageEncoder(pretrained_weights_path="/content/model_checkpoint.pth")
+
+
+
+#model = ImageEncoder(pretrained_weights_path="/content/model_checkpoint.pth")
 """ class ImageEncoder(ResNet):
 	def __init__(self,size=[540,540],resSet=[2,2,2,2],gar_latent_size=256):
 		super(ImageEncoder,self).__init__(BasicBlock,resSet)
@@ -467,14 +476,15 @@ def get_patchs_from_imgs(pros,imgs,imgbatch,box_len=32):
 	x2=pros[:,0]+box_len/2.
 	y1=pros[:,1]-box_len/2.
 	y2=pros[:,1]+box_len/2.
-	boxes=torch.stack((imgbatch.to(torch.float),x1,y1,x2,y2),dim=-1)
+	boxes = torch.stack((imgbatch.to(torch.float32), x1, y1, x2, y2), dim=-1)
+
 	return roi_align(imgs,boxes,(box_len,box_len))
 
 
 class ImageReconstructModel(Module):
 	def __init__(self,SkinWeightNet,with_classification=False):
 		super(ImageReconstructModel,self).__init__()
-		self.imgEncoder=ImageEncoder()
+		self.imgEncoder=ImageEncoder(pretrained_weights_path="/content/model_checkpoint.pth")
 		# self.patchEncoder=PatchEncoder()		
 		self.garments=['shirts','short_shirts','pants','short_pants','skirts','short_skirts']
 		self.garmentvnums=[4248,4258,5327,3721,5404,2818]
