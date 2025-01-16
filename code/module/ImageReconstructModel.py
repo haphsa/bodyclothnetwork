@@ -138,7 +138,7 @@ class ImageEncoder(nn.Module):
             self.resnet50.load_state_dict(model_state_dict, strict=False)
         
         # The fully connected layers should correspond to the size you want to output
-        self.fc = nn.Linear(2048, 2048)  # ResNet-50 has 2048 features from the last layer
+        self.fc = nn.Linear(2048, 64)  # ResNet-50 has 2048 features from the last layer
         self.dropout = nn.Dropout(p=0.9)
         self.shape_fc = nn.Linear(2048, 10)
         self.pose_fc = nn.Linear(2048, 24 * 9)  # output matrix formation
